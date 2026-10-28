@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion as Motion } from "framer-motion";
-import { AlertCircle, CheckCircle2, Loader2, Send, X, Mail } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Send, X, Mail, Info } from "lucide-react";
+import { siteData } from "../config/siteData";
 
-const WEB3FORMS_ACCESS_KEY =
-  import.meta.env.VITE_WEB3FORMS_ACCESS_KEY ||
-  "19dc2270-5036-4ecc-ab84-41ddc912e0c1";
+// Optional external form services (configured via Vite environment variables)
+const FORMSPREE_ENDPOINT = import.meta.env.VITE_FORMSPREE_ENDPOINT || "";
+const WEB3FORMS_ACCESS_KEY = import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || "";
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim());
@@ -14,24 +15,29 @@ export default function ContactForm() {
   const [values, setValues] = useState({
     name: "",
     email: "",
+    subject: "",
     message: "",
   });
 
   const [touched, setTouched] = useState({
     name: false,
     email: false,
+    subject: false,
     message: false,
   });
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [infoMessage, setInfoMessage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const errorTimer = useRef(null);
+  const infoTimer = useRef(null);
 
   useEffect(() => {
     return () => {
       if (errorTimer.current) window.clearTimeout(errorTimer.current);
+      if (infoTimer.current) window.clearTimeout(infoTimer.current);
     };
   }, []);
 
@@ -39,13 +45,21 @@ export default function ContactForm() {
     const currentErrors = {};
 
     if (!values.name.trim()) {
-      currentErrors.name = "Name is required.";
+      currentErrors.name = "Full Name is required.";
+    } else if (values.name.trim().length < 2) {
+      currentErrors.name = "Please enter your full name (at least 2 characters).";
     }
 
     if (!values.email.trim()) {
-      currentErrors.email = "Email is required.";
+      currentErrors.email = "Email Address is required.";
     } else if (!isValidEmail(values.email)) {
-      currentErrors.email = "Please enter a valid email address.";
+      currentErrors.email = "Please enter a valid email address (e.g., name@example.com).";
+    }
+
+    if (!values.subject.trim()) {
+      currentErrors.subject = "Subject is required.";
+    } else if (values.subject.trim().length < 3) {
+      currentErrors.subject = "Subject must be at least 3 characters.";
     }
 
     if (!values.message.trim()) {
@@ -60,22 +74,21 @@ export default function ContactForm() {
   const hasErrors = Object.keys(errors).length > 0;
 
   const setField = (field, value) => {
-    setValues((previousValues) => ({
-      ...previousValues,
+    setValues((prev) => ({
+      ...prev,
       [field]: value,
     }));
   };
 
   const markTouched = (field) => {
-    setTouched((previousTouched) => ({
-      ...previousTouched,
+    setTouched((prev) => ({
+      ...prev,
       [field]: true,
     }));
   };
 
   const handleCloseSuccess = () => {
     setShowSuccessModal(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const dismissError = () => {
@@ -86,25 +99,39 @@ export default function ContactForm() {
     setErrorMessage(null);
   };
 
-  const showError = (msg = "Something went wrong. Please try again in a moment.") => {
-    if (errorTimer.current) {
-      window.clearTimeout(errorTimer.current);
+  const dismissInfo = () => {
+    if (infoTimer.current) {
+      window.clearTimeout(infoTimer.current);
+      infoTimer.current = null;
     }
+    setInfoMessage(null);
+  };
+
+  const showError = (msg) => {
+    if (errorTimer.current) window.clearTimeout(errorTimer.current);
     setErrorMessage(msg);
     errorTimer.current = window.setTimeout(() => {
       setErrorMessage(null);
       errorTimer.current = null;
-    }, 6000);
+    }, 8000);
+  };
+
+  const showInfo = (msg) => {
+    if (infoTimer.current) window.clearTimeout(infoTimer.current);
+    setInfoMessage(msg);
+    infoTimer.current = window.setTimeout(() => {
+      setInfoMessage(null);
+      infoTimer.current = null;
+    }, 8000);
   };
 
   const handleSendViaMailto = () => {
-    const subject = encodeURIComponent(
-      values.name ? `Portfolio Inquiry from ${values.name}` : "Junior QS Opportunity Inquiry"
-    );
-    const body = encodeURIComponent(
-      `Name: ${values.name || "N/A"}\nEmail: ${values.email || "N/A"}\n\nMessage:\n${values.message || ""}`
-    );
-    window.location.href = `mailto:jaseermohamed86@gmail.com?subject=${subject}&body=${body}`;
+    const recipient = siteData.email || "jaseermohamed86@gmail.com";
+    const subjectText = values.subject.trim() || (values.name ? `Portfolio Inquiry from ${values.name}` : "Junior QS Opportunity Inquiry");
+    const bodyText = `Name: ${values.name || "N/A"}\nEmail: ${values.email || "N/A"}\n\nMessage:\n${values.message || ""}`;
+
+    const mailtoUrl = `mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent(subjectText)}&body=${encodeURIComponent(bodyText)}`;
+    window.location.href = mailtoUrl;
   };
 
   const handleSubmit = async (event) => {
@@ -113,6 +140,7 @@ export default function ContactForm() {
     setTouched({
       name: true,
       email: true,
+      subject: true,
       message: true,
     });
 
@@ -123,39 +151,63 @@ export default function ContactForm() {
     setIsSubmitting(true);
 
     try {
-      const formData = new FormData(event.target);
-      formData.set("access_key", WEB3FORMS_ACCESS_KEY);
-      formData.set("subject", "New Portfolio Contact Message");
-      formData.set("from_name", "Mohamed Jeseer Portfolio");
-
-      const response = await fetch("https://api.web3forms.com/submit", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        event.target.reset();
-
-        setValues({
-          name: "",
-          email: "",
-          message: "",
+      // 1. Check if Formspree endpoint is configured
+      if (FORMSPREE_ENDPOINT) {
+        const response = await fetch(FORMSPREE_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            name: values.name,
+            email: values.email,
+            subject: values.subject,
+            message: values.message,
+          }),
         });
 
-        setTouched({
-          name: false,
-          email: false,
-          message: false,
+        if (response.ok) {
+          setValues({ name: "", email: "", subject: "", message: "" });
+          setTouched({ name: false, email: false, subject: false, message: false });
+          setShowSuccessModal(true);
+        } else {
+          showError("Online form delivery failed. Click below to send directly via your email app.");
+        }
+      }
+      // 2. Check if Web3Forms key is configured
+      else if (WEB3FORMS_ACCESS_KEY) {
+        const formData = new FormData();
+        formData.append("access_key", WEB3FORMS_ACCESS_KEY);
+        formData.append("name", values.name);
+        formData.append("email", values.email);
+        formData.append("subject", values.subject);
+        formData.append("message", values.message);
+        formData.append("from_name", "Mohamed Jeseer Portfolio");
+
+        const response = await fetch("https://api.web3forms.com/submit", {
+          method: "POST",
+          body: formData,
         });
 
-        setShowSuccessModal(true);
-      } else {
-        showError("Online form delivery failed. You can send directly using your email app.");
+        const data = await response.json();
+        if (data.success) {
+          setValues({ name: "", email: "", subject: "", message: "" });
+          setTouched({ name: false, email: false, subject: false, message: false });
+          setShowSuccessModal(true);
+        } else {
+          showError("Online form delivery service returned an error. Click below to send via your email app.");
+        }
+      }
+      // 3. Fallback when no external service endpoint is configured in .env
+      else {
+        handleSendViaMailto();
+        showInfo(
+          `Opening your email client to send to ${siteData.email}. (To enable direct online submissions, configure your Formspree endpoint in .env)`
+        );
       }
     } catch {
-      showError("Could not reach online service. Click 'Send via Email App' to send directly.");
+      showError("Could not reach online message service. Please click below to send via your email app.");
     } finally {
       setIsSubmitting(false);
     }
@@ -163,7 +215,7 @@ export default function ContactForm() {
 
   return (
     <div className="surface rounded-2xl p-6 sm:p-7">
-      <h3 className="text-xl font-extrabold tracking-tight">
+      <h3 className="text-xl font-extrabold tracking-tight text-(--text)">
         Send a Message
       </h3>
 
@@ -171,15 +223,11 @@ export default function ContactForm() {
         Fill out the form below or contact directly via email.
       </p>
 
-      <form
-        onSubmit={handleSubmit}
-        className="mt-6 space-y-4"
-        noValidate
-      >
-        {/* Name */}
+      <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
+        {/* Full Name */}
         <div>
           <label className="form-label" htmlFor="name">
-            Name <span className="text-red-500" aria-hidden="true">*</span>
+            Full Name <span className="text-red-500" aria-hidden="true">*</span>
           </label>
 
           <input
@@ -188,14 +236,14 @@ export default function ContactForm() {
             type="text"
             required
             value={values.name}
-            onChange={(event) => setField("name", event.target.value)}
+            onChange={(e) => setField("name", e.target.value)}
             onBlur={() => markTouched("name")}
             className={
               touched.name && errors.name
                 ? "form-input form-error"
                 : "form-input"
             }
-            placeholder="Your name"
+            placeholder="e.g. John Smith"
             autoComplete="name"
             aria-required="true"
             aria-invalid={touched.name && Boolean(errors.name)}
@@ -210,10 +258,10 @@ export default function ContactForm() {
           )}
         </div>
 
-        {/* Email */}
+        {/* Email Address */}
         <div>
           <label className="form-label" htmlFor="email">
-            Email <span className="text-red-500" aria-hidden="true">*</span>
+            Email Address <span className="text-red-500" aria-hidden="true">*</span>
           </label>
 
           <input
@@ -222,14 +270,14 @@ export default function ContactForm() {
             type="email"
             required
             value={values.email}
-            onChange={(event) => setField("email", event.target.value)}
+            onChange={(e) => setField("email", e.target.value)}
             onBlur={() => markTouched("email")}
             className={
               touched.email && errors.email
                 ? "form-input form-error"
                 : "form-input"
             }
-            placeholder="you@example.com"
+            placeholder="e.g. john.smith@company.com"
             autoComplete="email"
             aria-required="true"
             aria-invalid={touched.email && Boolean(errors.email)}
@@ -240,6 +288,39 @@ export default function ContactForm() {
           {touched.email && errors.email && (
             <p id="email-error" className="form-help" role="alert">
               {errors.email}
+            </p>
+          )}
+        </div>
+
+        {/* Subject */}
+        <div>
+          <label className="form-label" htmlFor="subject">
+            Subject <span className="text-red-500" aria-hidden="true">*</span>
+          </label>
+
+          <input
+            id="subject"
+            name="subject"
+            type="text"
+            required
+            value={values.subject}
+            onChange={(e) => setField("subject", e.target.value)}
+            onBlur={() => markTouched("subject")}
+            className={
+              touched.subject && errors.subject
+                ? "form-input form-error"
+                : "form-input"
+            }
+            placeholder="e.g. Junior Quantity Surveyor Opportunity — UAE"
+            aria-required="true"
+            aria-invalid={touched.subject && Boolean(errors.subject)}
+            aria-describedby={touched.subject && errors.subject ? "subject-error" : undefined}
+            disabled={isSubmitting}
+          />
+
+          {touched.subject && errors.subject && (
+            <p id="subject-error" className="form-help" role="alert">
+              {errors.subject}
             </p>
           )}
         </div>
@@ -255,14 +336,14 @@ export default function ContactForm() {
             name="message"
             required
             value={values.message}
-            onChange={(event) => setField("message", event.target.value)}
+            onChange={(e) => setField("message", e.target.value)}
             onBlur={() => markTouched("message")}
             className={
               touched.message && errors.message
                 ? "form-textarea form-error"
                 : "form-textarea"
             }
-            placeholder="Tell me about your role or project opportunity…"
+            placeholder="Describe your project, role requirements, or inquiry..."
             rows={5}
             aria-required="true"
             aria-invalid={touched.message && Boolean(errors.message)}
@@ -277,10 +358,10 @@ export default function ContactForm() {
           )}
         </div>
 
-        {/* Spam protection (Honeypot) */}
+        {/* Spam protection honeypot */}
         <input
           type="checkbox"
-          name="botcheck"
+          name="_gotcha"
           className="hidden"
           style={{ display: "none" }}
           tabIndex="-1"
@@ -289,6 +370,7 @@ export default function ContactForm() {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          {/* Primary "Send a Message" button */}
           <button
             type="submit"
             className="btn-primary inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold shadow-md transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
@@ -297,21 +379,22 @@ export default function ContactForm() {
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Sending...</span>
+                <span>Sending Message...</span>
               </>
             ) : (
               <>
                 <Send className="h-4 w-4" />
-                <span>Submit Form</span>
+                <span>Send a Message</span>
               </>
             )}
           </button>
 
+          {/* Direct Email Application fallback */}
           <button
             type="button"
             onClick={handleSendViaMailto}
             className="surface surface-hover inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-(--text)"
-            title="Open in your default email client"
+            title="Open in your default email application"
           >
             <Mail className="h-4 w-4 text-(--primary)" />
             <span>Send via Email App</span>
@@ -319,7 +402,7 @@ export default function ContactForm() {
         </div>
       </form>
 
-      {/* Centered Success Modal matching portfolio theme */}
+      {/* Success Modal */}
       <AnimatePresence>
         {showSuccessModal && (
           <Motion.div
@@ -345,7 +428,6 @@ export default function ContactForm() {
               onClick={(e) => e.stopPropagation()}
               className="relative w-full max-w-md rounded-3xl border border-(--border) bg-(--bg) p-6 sm:p-8 shadow-2xl text-center"
             >
-              {/* Top-right close button */}
               <button
                 type="button"
                 onClick={handleCloseSuccess}
@@ -355,12 +437,10 @@ export default function ContactForm() {
                 <X className="h-5 w-5" />
               </button>
 
-              {/* Theme-aligned Checkmark Badge */}
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500 ring-8 ring-emerald-500/5 mb-5 dark:bg-emerald-500/20 dark:text-emerald-400">
                 <CheckCircle2 className="h-8 w-8" />
               </div>
 
-              {/* Title */}
               <h3
                 id="success-modal-title"
                 className="text-xl sm:text-2xl font-extrabold tracking-tight text-(--text)"
@@ -368,22 +448,20 @@ export default function ContactForm() {
                 Message Sent Successfully!
               </h3>
 
-              {/* Subtitle */}
               <p
                 id="success-modal-desc"
                 className="mt-2.5 text-sm text-muted leading-relaxed"
               >
-                Thank you for reaching out. I&apos;ll get back to you as soon as possible.
+                Thank you for reaching out. Your message has been delivered to Mohamed Jeseer, and I will get back to you promptly.
               </p>
 
-              {/* Action Button */}
               <div className="mt-6">
                 <button
                   type="button"
                   onClick={handleCloseSuccess}
                   className="btn-primary inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold shadow-md transition-transform hover:-translate-y-0.5"
                 >
-                  <span>Got it, thank you!</span>
+                  <span>Close</span>
                 </button>
               </div>
             </Motion.div>
@@ -391,7 +469,40 @@ export default function ContactForm() {
         )}
       </AnimatePresence>
 
-      {/* Floating Error Toast with Mailto button */}
+      {/* Floating Info Notification */}
+      <AnimatePresence>
+        {infoMessage && (
+          <Motion.div
+            role="status"
+            aria-live="polite"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="fixed bottom-6 left-4 right-4 z-70 mx-auto flex max-w-md items-start gap-3.5 rounded-2xl border border-blue-500/20 bg-(--bg) backdrop-blur-xl p-4 shadow-xl sm:left-auto sm:right-6 sm:mx-0 sm:w-96"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 dark:bg-blue-500/20 dark:text-blue-400">
+              <Info className="h-5 w-5" />
+            </div>
+
+            <div className="min-w-0 flex-1 pt-0.5">
+              <p className="text-sm font-bold tracking-tight text-(--text)">Notice</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">{infoMessage}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={dismissInfo}
+              className="shrink-0 rounded-lg p-1 text-muted transition-colors hover:bg-black/5 hover:text-(--text) dark:hover:bg-white/10"
+              aria-label="Close notification"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </Motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Error Toast */}
       <AnimatePresence>
         {errorMessage && (
           <Motion.div
@@ -408,12 +519,8 @@ export default function ContactForm() {
             </div>
 
             <div className="min-w-0 flex-1 pt-0.5">
-              <p className="text-sm font-bold tracking-tight text-(--text)">
-                Notice
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-muted">
-                {errorMessage}
-              </p>
+              <p className="text-sm font-bold tracking-tight text-(--text)">Notice</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">{errorMessage}</p>
               <button
                 type="button"
                 onClick={handleSendViaMailto}

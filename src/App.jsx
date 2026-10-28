@@ -1,18 +1,17 @@
 import Header from "./components/Header";
 import Hero from "./components/Hero";
+import About from "./components/About";
 import Expertise from "./components/Expertise";
-import Skills from "./components/Skills";
 import Projects from "./components/Projects";
 import Experience from "./components/Experience";
-import Certifications from "./components/Certifications";
+import Strengths from "./components/Strengths";
 import Contact from "./components/Contact";
 import BackToTop from "./components/BackToTop";
 import FloatingSocialBar from "./components/FloatingSocialBar";
-import { siteData } from "./config/siteData";
+import Footer from "./components/Footer";
 import { useTheme } from "./hooks/useTheme";
 
 import JeseerProfile from "./assets/JeseerProfile.jpg";
-import Footer from "./components/Footer";
 
 export default function App() {
   const { isDark, toggleTheme } = useTheme();
@@ -24,14 +23,13 @@ export default function App() {
 
       <main className="pt-16 md:pt-20">
         <Hero profileSrc={profileSrc} />
-
+        <About />
         <Expertise />
-        <Skills />
         <Projects />
         <Experience />
-        <Certifications />
+        <Strengths />
         <Contact />
-        <Footer/>
+        <Footer />
       </main>
 
       <BackToTop />

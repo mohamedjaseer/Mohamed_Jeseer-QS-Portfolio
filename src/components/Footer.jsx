@@ -18,7 +18,7 @@ export default function Footer() {
 
         {/* Tagline */}
         <p className="mt-3 text-sm text-muted">
-          Junior Quantity Surveyor — Civil / MEP | Cost Estimation & Contract Administration
+          Junior Quantity Surveyor — Civil & MEP | Cost Estimation & Contract Administration
         </p>
 
         {/* Social icons */}
@@ -56,9 +56,6 @@ export default function Footer() {
           </button>
         </div>
       </div>
-
-      {/* Floating scroll-to-top circle (bottom-right) */}
-      
     </footer>
   );
 }

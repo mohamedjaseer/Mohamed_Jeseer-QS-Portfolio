@@ -186,11 +186,11 @@
   /* caret for typing */
   .type-caret {
     width: 2px;
-    height: 1.2em;
-    margin-left: 6px;
+    height: 0.85em;
+    margin-left: 5px;
     background: var(--primary);
     display: inline-block;
-    transform: translateY(2px);
+    vertical-align: middle;
     animation: caretBlink 1s step-end infinite;
     border-radius: 2px;
   }
